@@ -17,7 +17,7 @@ Extruder::Extruder(unsigned int id, GCodeConfig *config) :
 std::pair<double, double> Extruder::extrude(double dE)
 {
     // in case of relative E distances we always reset to 0 before any output
-    if (m_config->use_relative_e_distances)
+    if (m_config->gcode_flavor != gcfFlashForge && m_config->use_relative_e_distances)
         m_E = 0.;
     // Quantize extruder delta to G-code resolution.
     dE = GCodeFormatter::quantize_e(dE);
@@ -38,7 +38,7 @@ std::pair<double, double> Extruder::extrude(double dE)
 std::pair<double, double> Extruder::retract(double retract_length, double restart_extra)
 {
     // in case of relative E distances we always reset to 0 before any output
-    if (m_config->use_relative_e_distances)
+    if (m_config->gcode_flavor != gcfFlashForge && m_config->use_relative_e_distances)
         m_E = 0.;
     // Quantize extruder delta to G-code resolution.
     double to_retract = this->retract_to_go(retract_length);

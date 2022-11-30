@@ -839,7 +839,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
 namespace DoExport {
     static void init_gcode_processor(const PrintConfig& config, GCodeProcessor& processor, bool& silent_time_estimator_enabled)
     {
-        silent_time_estimator_enabled = (config.gcode_flavor == gcfMarlinLegacy || config.gcode_flavor == gcfMarlinFirmware)
+        silent_time_estimator_enabled = (config.gcode_flavor == gcfFlashForge || config.gcode_flavor == gcfMarlinLegacy || config.gcode_flavor == gcfMarlinFirmware)
                                         && config.silent_mode;
         processor.reset();
         processor.apply_config(config);
@@ -1382,7 +1382,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                 bbox_prime.offset(0.5f);
                 bool overlap = bbox_prime.overlap(bbox_print);
 
-                if (print.config().gcode_flavor == gcfMarlinLegacy || print.config().gcode_flavor == gcfMarlinFirmware) {
+                if (print.config().gcode_flavor == gcfFlashForge || print.config().gcode_flavor == gcfMarlinLegacy || print.config().gcode_flavor == gcfMarlinFirmware) {
                     file.write(this->retract());
                     file.write("M300 S800 P500\n"); // Beep for 500ms, tone 800Hz.
                     if (overlap) {
@@ -1721,7 +1721,7 @@ static bool custom_gcode_sets_temperature(const std::string &gcode, const int mc
 void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
 {
     const GCodeFlavor flavor = print.config().gcode_flavor.value;
-    if ( (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware)
+    if ( (flavor == gcfFlashForge || flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware)
      && print.config().machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) {
         int factor = flavor == gcfRepRapFirmware ? 60 : 1; // RRF M203 and M566 are in mm/min
         file.write_format("M201 X%d Y%d Z%d E%d ; sets maximum accelerations, mm/sec^2\n",
@@ -1740,7 +1740,7 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
         // backwards compatibility: https://github.com/prusa3d/PrusaSlicer/issues/1089
         // Legacy Marlin should export travel acceleration the same as printing acceleration.
         // MarlinFirmware has the two separated.
-        int travel_acc = flavor == gcfMarlinLegacy
+        int travel_acc = (flavor == gcfFlashForge || flavor == gcfMarlinLegacy)
                        ? int(print.config().machine_max_acceleration_extruding.values.front() + 0.5)
                        : int(print.config().machine_max_acceleration_travel.values.front() + 0.5);
         // Retract acceleration not accepted in M204 in RRF
@@ -1788,7 +1788,7 @@ void GCode::_print_first_layer_bed_temperature(GCodeOutputStream &file, Print &p
         temp = temp_by_gcode;
     // Always call m_writer.set_bed_temperature() so it will set the internal "current" state of the bed temp as if
     // the custom start G-code emited these.
-    std::string set_temp_gcode = m_writer.set_bed_temperature(temp, wait);
+    std::string set_temp_gcode = m_writer.set_bed_temperature(temp, wait, first_printing_extruder_id);
     if (! temp_set_by_gcode)
         file.write(set_temp_gcode);
 }
@@ -2170,8 +2170,11 @@ GCode::LayerResult GCode::process_layer(
             int temperature = print.config().temperature.get_at(extruder.id());
             if (temperature > 0 && temperature != print.config().first_layer_temperature.get_at(extruder.id()))
                 gcode += m_writer.set_temperature(temperature, false, extruder.id());
+
+            int bed_temperature = print.config().bed_temperature.get_at(extruder.id());
+            if (bed_temperature > 0 && bed_temperature != print.config().first_layer_bed_temperature.get_at(extruder.id()))
+                gcode += m_writer.set_bed_temperature(bed_temperature, false, extruder.id());
         }
-        gcode += m_writer.set_bed_temperature(print.config().bed_temperature.get_at(first_extruder_id));
         // Mark the temperature transition from 1st to 2nd layer to be finished.
         m_second_layer_things_done = true;
     }

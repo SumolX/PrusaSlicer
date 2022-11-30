@@ -20,7 +20,8 @@ void GCodeWriter::apply_print_config(const PrintConfig &print_config)
     this->config.apply(print_config, true);
     m_extrusion_axis = get_extrusion_axis(this->config);
     m_single_extruder_multi_material = print_config.single_extruder_multi_material.value;
-    bool use_mach_limits = print_config.gcode_flavor.value == gcfMarlinLegacy
+    bool use_mach_limits = print_config.gcode_flavor.value == gcfFlashForge
+                        || print_config.gcode_flavor.value == gcfMarlinLegacy
                         || print_config.gcode_flavor.value == gcfMarlinFirmware
                         || print_config.gcode_flavor.value == gcfRepRapFirmware;
     m_max_acceleration = std::lrint((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ?
@@ -103,7 +104,7 @@ std::string GCodeWriter::set_temperature(unsigned int temperature, bool wait, in
     }
     gcode << temperature;
     bool multiple_tools = this->multiple_extruders && ! m_single_extruder_multi_material;
-    if (tool != -1 && (multiple_tools || FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish) || FLAVOR_IS(gcfRepRapFirmware)) ) {
+    if (tool != -1 && (multiple_tools || FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish) || FLAVOR_IS(gcfRepRapFirmware) || FLAVOR_IS(gcfFlashForge))) {
         if (FLAVOR_IS(gcfRepRapFirmware)) {
             gcode << " P" << tool;
         } else {
@@ -118,7 +119,7 @@ std::string GCodeWriter::set_temperature(unsigned int temperature, bool wait, in
     return gcode.str();
 }
 
-std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait)
+std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait, int tool)
 {
     if (temperature == m_last_bed_temperature && (! wait || m_last_bed_temperature_reached))
         return std::string();
@@ -146,7 +147,11 @@ std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait
     } else {
         gcode << "S";
     }
-    gcode << temperature << " ; " << comment << "\n";
+    gcode << temperature;
+    if (FLAVOR_IS(gcfFlashForge)) {
+        gcode << " T" << tool;
+    }
+    gcode << " ; " << comment << "\n";
     
     if (FLAVOR_IS(gcfTeacup) && wait)
         gcode << "M116 ; wait for bed temperature to be reached\n";
@@ -192,12 +197,23 @@ std::string GCodeWriter::set_acceleration(unsigned int acceleration)
 
 std::string GCodeWriter::reset_e(bool force)
 {
-    return
-        FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish) || this->config.use_relative_e_distances ||
-        (m_extruder != nullptr && ! m_extruder->reset_E() && ! force) || 
-        m_extrusion_axis.empty() ?
-        std::string{} :
-        std::string("G92 ") + m_extrusion_axis + (this->config.gcode_comments ? "0 ; reset extrusion distance\n" : "0\n");
+    bool reset_extrusion_distance = false;
+
+    if (FLAVOR_IS(gcfFlashForge)) {
+        // FlashForge will use absolute e distances when relative e distances
+        // is not enabled, otherwise a resetting of e distances will occur.
+        if (this->config.use_relative_e_distances) {
+            reset_extrusion_distance = m_extruder != nullptr && !m_extruder->reset_E();
+        }
+    } else if (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish) || this->config.use_relative_e_distances ||
+               (m_extruder != nullptr && ! m_extruder->reset_E() && ! force) || 
+               m_extrusion_axis.empty()) {
+        reset_extrusion_distance = true;
+    }
+
+    return reset_extrusion_distance ?
+        std::string("G92 ") + m_extrusion_axis + (this->config.gcode_comments ? "0 ; reset extrusion distance\n" : "0\n") :
+        std::string{};
 }
 
 std::string GCodeWriter::update_progress(unsigned int num, unsigned int tot, bool allow_100) const
@@ -507,7 +523,13 @@ std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comm
         case gcfMachinekit:
             gcode << "M106 P" << 255.0 * speed / 100.0; break;
         default:
-            gcode << "M106 S" << 255.0 * speed / 100.0; break;
+            auto fan_speed = 255.0 * speed / 100.0;
+            if (gcode_flavor == gcfFlashForge) {
+                gcode << "M106 S" << static_cast<unsigned int>(fan_speed);
+            } else {
+                gcode << "M106 S" << fan_speed;
+            }
+            break;
         }
         if (gcode_comments) 
             gcode << " ; enable fan";

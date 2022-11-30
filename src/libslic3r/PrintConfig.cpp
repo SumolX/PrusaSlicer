@@ -49,6 +49,7 @@ static const t_config_enum_values s_keys_map_GCodeFlavor {
     { "repetier",       gcfRepetier },
     { "teacup",         gcfTeacup },
     { "makerware",      gcfMakerWare },
+    { "flashforge",     gcfFlashForge},
     { "marlin",         gcfMarlinLegacy },
     { "marlin2",        gcfMarlinFirmware },
     { "sailfish",       gcfSailfish },
@@ -1338,6 +1339,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("repetier");
     def->enum_values.push_back("teacup");
     def->enum_values.push_back("makerware");
+    def->enum_values.push_back("flashforge");
     def->enum_values.push_back("marlin");
     def->enum_values.push_back("marlin2");
     def->enum_values.push_back("sailfish");
@@ -1350,6 +1352,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back("Repetier");
     def->enum_labels.push_back("Teacup");
     def->enum_labels.push_back("MakerWare (MakerBot)");
+    def->enum_labels.push_back("FlashForge");
     def->enum_labels.push_back("Marlin (legacy)");
     def->enum_labels.push_back("Marlin 2");
     def->enum_labels.push_back("Sailfish (MakerBot)");
@@ -4095,6 +4098,7 @@ std::string validate(const FullPrintConfig &cfg)
         cfg.gcode_flavor.value != gcfSmoothie &&
         cfg.gcode_flavor.value != gcfRepRapSprinter &&
         cfg.gcode_flavor.value != gcfRepRapFirmware &&
+        cfg.gcode_flavor.value != gcfFlashForge &&
         cfg.gcode_flavor.value != gcfMarlinLegacy &&
         cfg.gcode_flavor.value != gcfMarlinFirmware &&
         cfg.gcode_flavor.value != gcfMachinekit &&
