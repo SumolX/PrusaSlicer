@@ -862,9 +862,9 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_result.filament_densities[i]  = static_cast<float>(config.filament_density.get_at(i));
     }
 
-    if ((m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware) && config.machine_limits_usage.value != MachineLimitsUsage::Ignore) {
+    if ((m_flavor == gcfFlashForge || m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware) && config.machine_limits_usage.value != MachineLimitsUsage::Ignore) {
         m_time_processor.machine_limits = reinterpret_cast<const MachineEnvelopeConfig&>(config);
-        if (m_flavor == gcfMarlinLegacy) {
+        if (m_flavor == gcfFlashForge || m_flavor == gcfMarlinLegacy) {
             // Legacy Marlin does not have separate travel acceleration, it uses the 'extruding' value instead.
             m_time_processor.machine_limits.machine_max_acceleration_travel = m_time_processor.machine_limits.machine_max_acceleration_extruding;
         }
@@ -1053,7 +1053,7 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     if (machine_limits_usage != nullptr)
         use_machine_limits = machine_limits_usage->value != MachineLimitsUsage::Ignore;
 
-    if (use_machine_limits && (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware)) {
+    if (use_machine_limits && (m_flavor == gcfFlashForge || m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware)) {
         const ConfigOptionFloats* machine_max_acceleration_x = config.option<ConfigOptionFloats>("machine_max_acceleration_x");
         if (machine_max_acceleration_x != nullptr)
             m_time_processor.machine_limits.machine_max_acceleration_x.values = machine_max_acceleration_x->values;
@@ -1112,7 +1112,7 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
 
 
         // Legacy Marlin does not have separate travel acceleration, it uses the 'extruding' value instead.
-        const ConfigOptionFloats* machine_max_acceleration_travel = config.option<ConfigOptionFloats>(m_flavor == gcfMarlinLegacy
+        const ConfigOptionFloats* machine_max_acceleration_travel = config.option<ConfigOptionFloats>(m_flavor == gcfFlashForge || m_flavor == gcfMarlinLegacy
                                                                                                     ? "machine_max_acceleration_extruding"
                                                                                                     : "machine_max_acceleration_travel");
         if (machine_max_acceleration_travel != nullptr)
@@ -1150,7 +1150,7 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
         m_time_processor.machines[i].travel_acceleration = (max_travel_acceleration > 0.0f) ? max_travel_acceleration : DEFAULT_TRAVEL_ACCELERATION;
     }
 
-    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) {
+    if (m_flavor == gcfFlashForge || m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) {
         const ConfigOptionBool* silent_mode = config.option<ConfigOptionBool>("silent_mode");
         if (silent_mode != nullptr) {
             if (silent_mode->value && m_time_processor.machine_limits.machine_max_acceleration_x.values.size() > 1)
@@ -2045,6 +2045,8 @@ bool GCodeProcessor::process_cura_tags(const std::string_view comment)
             m_flavor = gcfRepRapFirmware;
         else if (flavor == "Marlin")
             m_flavor = gcfMarlinLegacy;
+        else if (flavor == "FlashForge")
+            m_flavor = gcfFlashForge;
         else
             BOOST_LOG_TRIVIAL(warning) << "GCodeProcessor found unknown flavor: " << flavor;
 
@@ -3014,7 +3016,7 @@ void GCodeProcessor::process_M203(const GCodeReader::GCodeLine& line)
 
     // see http://reprap.org/wiki/G-code#M203:_Set_maximum_feedrate
     // http://smoothieware.org/supported-g-codes
-    float factor = (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfSmoothie) ? 1.0f : MMMIN_TO_MMSEC;
+    float factor = (m_flavor == gcfFlashForge || m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfSmoothie) ? 1.0f : MMMIN_TO_MMSEC;
 
     for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
         if (static_cast<PrintEstimatedStatistics::ETimeMode>(i) == PrintEstimatedStatistics::ETimeMode::Normal ||
@@ -3187,7 +3189,7 @@ void GCodeProcessor::process_T(const std::string_view command)
         int eid = 0;
         if (! parse_number(command.substr(1), eid) || eid < 0 || eid > 255) {
             // Specific to the MMU2 V2 (see https://www.help.prusa3d.com/en/article/prusa-specific-g-codes_112173):
-            if ((m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) && (command == "Tx" || command == "Tc" || command == "T?"))
+            if ((m_flavor == gcfFlashForge || m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) && (command == "Tx" || command == "Tc" || command == "T?"))
                 return;
 
             // T-1 is a valid gcode line for RepRap Firmwares (used to deselects all tools) see https://github.com/prusa3d/PrusaSlicer/issues/5677
@@ -3438,4 +3440,3 @@ void GCodeProcessor::update_estimated_times_stats()
 }
 
 } /* namespace Slic3r */
-

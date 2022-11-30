@@ -395,7 +395,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             }
             if ((line.type & CoolingLine::TYPE_G92) == 0) {
                 // G0 or G1. Calculate the duration.
-                if (m_config.use_relative_e_distances.value)
+                if (m_config.gcode_flavor != gcfFlashForge && m_config.use_relative_e_distances.value)
                     // Reset extruder accumulator.
                     current_pos[3] = 0.f;
                 float dif[4];

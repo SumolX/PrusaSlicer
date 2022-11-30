@@ -18,7 +18,7 @@ Extruder::Extruder(unsigned int id, GCodeConfig *config) :
 double Extruder::extrude(double dE)
 {
     // in case of relative E distances we always reset to 0 before any output
-    if (m_config->use_relative_e_distances)
+    if (m_config->gcode_flavor != gcfFlashForge && m_config->use_relative_e_distances)
         m_E = 0.;
     m_E          += dE;
     m_absolute_E += dE;
@@ -37,7 +37,7 @@ double Extruder::extrude(double dE)
 double Extruder::retract(double length, double restart_extra)
 {
     // in case of relative E distances we always reset to 0 before any output
-    if (m_config->use_relative_e_distances)
+    if (m_config->gcode_flavor != gcfFlashForge && m_config->use_relative_e_distances)
         m_E = 0.;
     double to_retract = std::max(0., length - m_retracted);
     if (to_retract > 0.) {
