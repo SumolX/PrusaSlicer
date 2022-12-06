@@ -197,21 +197,31 @@ std::string GCodeWriter::set_acceleration(unsigned int acceleration)
 
 std::string GCodeWriter::reset_e(bool force)
 {
-    bool reset_extrusion_distance = false;
+    bool reset_distance = false;
+	auto reset_extruder =
+		[this](const bool& forced)->bool{
+			if (m_extruder != nullptr) {
+				if (m_extruder->E() == 0. && ! forced) {
+				    return false;
+			    }
+				m_extruder->reset_E();
+			}
+			return true;
+		};
 
     if (FLAVOR_IS(gcfFlashForge)) {
         // FlashForge will use absolute e distances when relative e distances
         // is not enabled, otherwise a resetting of e distances will occur.
         if (this->config.use_relative_e_distances) {
-            reset_extrusion_distance = m_extruder != nullptr && !m_extruder->reset_E();
+            reset_distance = reset_extruder(force);
         }
-    } else if (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish) || this->config.use_relative_e_distances ||
-               (m_extruder != nullptr && ! m_extruder->reset_E() && ! force) || 
-               m_extrusion_axis.empty()) {
-        reset_extrusion_distance = true;
-    }
+    } else if (! (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish))
+               && reset_extruder(force)
+               && (! m_extrusion_axis.empty() && ! this->config.use_relative_e_distances)) {
+		reset_distance = true;
+	}
 
-    return reset_extrusion_distance ?
+    return reset_distance ?
         std::string("G92 ") + m_extrusion_axis + (this->config.gcode_comments ? "0 ; reset extrusion distance\n" : "0\n") :
         std::string{};
 }
