@@ -52,7 +52,7 @@ SCENARIO( "PrintGCode basic functionality", "[PrintGCode]") {
             }
 
             THEN("GCode preamble is emitted.") {
-                REQUIRE(gcode.find("G21 ; set units to millimeters") != std::string::npos);
+                REQUIRE(gcode.find("; set units to millimeters") != std::string::npos);
             }
 
             THEN("Config options emitted for print config, default region config, default object config") {

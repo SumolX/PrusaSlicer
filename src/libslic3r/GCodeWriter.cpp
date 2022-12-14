@@ -47,8 +47,10 @@ std::string GCodeWriter::preamble()
     std::ostringstream gcode;
     
     if (FLAVOR_IS_NOT(gcfMakerWare)) {
-        gcode << "G21 ; set units to millimeters\n";
-        gcode << "G90 ; use absolute coordinates\n";
+        gcode << "; set units to millimeters\n";
+        gcode << "G21\n";
+        gcode << "; use absolute coordinates\n";
+        gcode << "G90\n";
     }
     if (FLAVOR_IS(gcfRepRapSprinter) ||
         FLAVOR_IS(gcfRepRapFirmware) ||
@@ -59,9 +61,11 @@ std::string GCodeWriter::preamble()
         FLAVOR_IS(gcfSmoothie))
     {
         if (this->config.use_relative_e_distances) {
-            gcode << "M83 ; use relative distances for extrusion\n";
+            gcode << "; use relative distances for extrusion\n";
+            gcode << "M83\n";
         } else {
-            gcode << "M82 ; use absolute distances for extrusion\n";
+            gcode << "; use absolute distances for extrusion\n";
+            gcode << "M82\n";
         }
         gcode << this->reset_e(true);
     }
@@ -73,7 +77,8 @@ std::string GCodeWriter::postamble() const
 {
     std::ostringstream gcode;
     if (FLAVOR_IS(gcfMachinekit))
-          gcode << "M2 ; end of program\n";
+          gcode << "; end of program\n";
+          gcode << "M2\n";
     return gcode.str();
 }
 
@@ -96,7 +101,7 @@ std::string GCodeWriter::set_temperature(unsigned int temperature, bool wait, in
     }
     
     std::ostringstream gcode;
-    gcode << code << " ";
+    gcode << "; " << comment << "\n" << code << " ";
     if (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMachinekit)) {
         gcode << "P";
     } else {
@@ -111,11 +116,19 @@ std::string GCodeWriter::set_temperature(unsigned int temperature, bool wait, in
             gcode << " T" << tool;
         }
     }
-    gcode << " ; " << comment << "\n";
+    gcode << "\n";
     
-    if ((FLAVOR_IS(gcfTeacup) || FLAVOR_IS(gcfRepRapFirmware)) && wait)
-        gcode << "M116 ; wait for temperature to be reached\n";
+    if (wait) {
+        gcode << "; wait for temperature to be reached\n";
     
+        if ((FLAVOR_IS(gcfTeacup) || FLAVOR_IS(gcfRepRapFirmware))) {
+            gcode << "M116\n";
+        }
+        else if (FLAVOR_IS(gcfFlashForge)) {
+            gcode << "M6 T" << tool << "\n";
+        }
+    }
+
     return gcode.str();
 }
 
@@ -141,7 +154,7 @@ std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait
     }
     
     std::ostringstream gcode;
-    gcode << code << " ";
+    gcode << "; " << comment << "\n" << code << " ";
     if (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMachinekit)) {
         gcode << "P";
     } else {
@@ -151,10 +164,18 @@ std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait
     if (FLAVOR_IS(gcfFlashForge)) {
         gcode << " T" << tool;
     }
-    gcode << " ; " << comment << "\n";
-    
-    if (FLAVOR_IS(gcfTeacup) && wait)
-        gcode << "M116 ; wait for bed temperature to be reached\n";
+    gcode << "\n";
+
+    if (wait) {
+        gcode << "; wait for bed temperature to be reached\n";
+
+        if (FLAVOR_IS(gcfTeacup)) {
+            gcode << "M116\n";
+        }
+        else if (FLAVOR_IS(gcfFlashForge)) {
+            gcode << "M7 T" << tool << "\n";
+        }
+    }
     
     return gcode.str();
 }
